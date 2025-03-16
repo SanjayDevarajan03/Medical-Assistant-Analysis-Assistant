@@ -7,3 +7,4 @@ transformers
 tensorflow
 opencv
 python-dotenv
+streamlit
