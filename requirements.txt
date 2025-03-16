@@ -1,0 +1,9 @@
+sentence-transformers
+pandas
+numpy
+scikit-learn
+pytorch
+transformers
+tensorflow
+opencv
+python-dotenv
