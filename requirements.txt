@@ -5,6 +5,7 @@ scikit-learn
 pytorch
 transformers
 tensorflow
-opencv
 python-dotenv
 streamlit
+Pillow
+opencv
