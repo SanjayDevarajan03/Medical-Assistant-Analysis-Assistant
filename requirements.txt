@@ -2,10 +2,10 @@ sentence-transformers
 pandas
 numpy
 scikit-learn
-pytorch
+torch
 transformers
 tensorflow
 python-dotenv
 streamlit
 Pillow
-opencv
+#opencv
