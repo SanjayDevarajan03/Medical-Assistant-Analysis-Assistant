@@ -86,7 +86,11 @@ def load_and_preprocess_image(image_path):
             image_array = (image_array * 255).astype(np.uint8)
             image = Image.fromarray(image_array)
         except Exception as e:
-            pass
+            print(f"Error reading DICOM: {e}")
+
+    
+    else:
+        # Handle regular image formats
 
 
 
