@@ -72,8 +72,20 @@ def load_and_preprocess_image(image_path):
 
             else:
                 window_center = Config.WINDOW_CENTER
+                window_width = Config.WINDOW_WIDTH
+            
 
-        except:
+            # Apply windowing
+            window_min = window_center - window_width // 2
+            window_max= window_center + window_width // 2
+            image_array = np.clip(image_array, window_min, window_max)
+            image_array = (image_array - window_min)/(window_max-window_min)
+
+            # Convert to RGB
+            image_array = np.stack([image_array, image_array, image_array], axis=2)
+            image_array = (image_array * 255).astype(np.uint8)
+            image = Image.fromarray(image_array)
+        except Exception as e:
             pass
 
 
