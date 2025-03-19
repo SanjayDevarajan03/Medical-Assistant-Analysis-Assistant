@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 from config import Config
 
-class Vocabulart:
+class Vocabulary:
     def __init__(self):
         self.word2idx = {"<PAD>": 0, "<SOS>": 1, "<EOS>": 2, "<UNK>": 3}
         self.idx2word = {0: "<PAD>", 1: "<SOS>", 2: "<EOS>", 3:"<UNK"}
@@ -91,6 +91,38 @@ def load_and_preprocess_image(image_path):
     
     else:
         # Handle regular image formats
+        try:
+            image = Image.open(path).convert('RGB')
+        except:
+            print(f"Error printing image: {path}")
+            return None
+        
+    
+    return image
+
+
+class MedicalCaptionDataset(Dataset):
+    def __init__(self, image_paths, captions, vocabulary, transform=None):
+        self.image_paths = image_paths
+        self.captions= captions
+        self.vocab = vocabulary
+        self.transform = transform or transforms.Compose([
+            transforms.Resize(Config.IMG_SIZE),
+            transforms.ToTensor()
+        ])
+
+def get_iu_xray_data():
+    pass
+
+
+def create_data_loaders():
+    """Create train and validation data loaders"""
+    # Get data
+    image_paths, captions = get_iu_xray_data()
+
+    # Create vocabulary
+    vocab = Vocabulary()
+    vocab.build_voacb(captions, threshold = Config.MIN_WORD_FREQ)
 
 
 
