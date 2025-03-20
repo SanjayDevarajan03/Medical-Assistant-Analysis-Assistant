@@ -4,7 +4,7 @@ from PIL import Image
 import pydicom
 from pathlib import Path
 from config import Config
-import torchvision.transformers as transfomers
+from torchvision import transforms
 from torch.utils.data import Dataset
 
 def read_dicom(dicom_path):

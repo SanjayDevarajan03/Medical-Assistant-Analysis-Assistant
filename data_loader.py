@@ -151,6 +151,39 @@ def get_iu_xray_data():
     image_paths = []
     captions = []
 
+    # Sample data processing logic (replace with actual implementation)
+    dataset_path = Config.IU_XRAY_PATH
+    images_dir = dataset_path/"files"
+    reports_file = dataset_path/"reports.json"
+
+    if not os.path.exists(reports_file):
+        print(f"Reports file not found: {reports_file}")
+        # For demo purposes, create dummy files
+        for i in range(100):
+            image_paths.append(f"dummy_path_{i}.jpg")
+            captions.append(f"This is a normal chest X-ray with no significant findings.")
+        return image_paths, captions
+    
+    # Load reports
+    with open(reports_file, 'r') as f:
+        reports = json.load(f)
+
+    # Process reports and match with images
+    for study_id, report in reports.items():
+        # Find corresponding images
+        study_images = list((images_dir/study_id).glob("*.dcm"))
+        if study_images:
+            # Extract findings ection as caption
+            findings= report.get("findings","No findings recorded")
+
+            # Add each image with the same report
+            for img_path in study_images:
+                image_paths.append(str(img_path))
+                captions.append(findings)
+
+    return image_paths, captions
+
+
 
 def create_data_loaders():
     """Create train and validation data loaders"""
@@ -193,13 +226,29 @@ def create_data_loaders():
         transform = train_transform
     )
 
-    val_dataset = MedicalCaptionDataset
+    val_dataset = MedicalCaptionDataset(
+        [image_paths[i] for i in val_indices],
+        [captions[i] for i in val_indices],
+        vocab,
+        transform = train_transform
+    )
     
+    # Create data loaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=Config.BATCH_SIZE,
+        shuffle=True,
+        num_workers = Config.NUM_WORKERS
+    )
 
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=Config.BATCH_SIZE,
+        shuffle=True,
+        num_workers=Config.NUM_WORKERS
+    )
 
-
-            # Apply windowing if available
-
+    return train_loader, val_loader
 
 
             
