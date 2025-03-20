@@ -124,6 +124,24 @@ def create_data_loaders():
     vocab = Vocabulary()
     vocab.build_voacb(captions, threshold = Config.MIN_WORD_FREQ)
 
+    # Split data
+    data_size= len(image_paths)
+    indices = list(range(data_size))
+    np.random.shuffle(indices)
+
+    split = int(0.9 * data_size)
+    train_indices = indices[:split]
+    val_indices = indices[split:]
+
+
+    # Creata datasets
+    train_transform = transforms.Compose(
+        transforms.Resize(Config.IMG_SIZE),
+        transforms.RandomHorizontalFlip(p=0.2),
+        transforms.RandomAffine(degrees=5, translate=(0.05, 0.05))
+         
+    ) # Careful with medical images
+
 
 
             # Apply windowing if available
