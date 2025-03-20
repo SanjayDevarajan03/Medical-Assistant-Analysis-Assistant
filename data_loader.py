@@ -108,11 +108,48 @@ class MedicalCaptionDataset(Dataset):
         self.vocab = vocabulary
         self.transform = transform or transforms.Compose([
             transforms.Resize(Config.IMG_SIZE),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(mean=Config.PIXEL_MEAN, std=Config.PIXEL_STD)
         ])
 
+
+    def __getitem__(self, idx):
+        image_path = self.image_paths[idx]
+        caption = self.captions[idx]
+
+        # Load and preprocess image
+        image = load_and_preprocess_image(image_path)
+        if image is None:
+            # Return a placeholder if image loading fails
+            image = Image.new('RGB', Config.IMG_SIZE, color=0)
+
+        if self.transform:
+            image = self.transform(image)
+
+
+        # Tokenize caption 
+        tokens = [self.vocab.word2idx.get(word.lower(), self.vocab.word2idx["<UNK>"]) for word in caption.split()]
+        tokens = [self.vocab.word2idx["<SSO>"]] + tokens + [self.vocab.word2idx["<EOS>"]]
+
+        # Pad or truncate caption
+        if len(tokens) < Config.MAX_CAPTION_LENGTH:
+            tokens = tokens + [self.vocab.word2idx["<PAD>"]] * (Config.MAX_CAPTION_LENGTH)
+        else:
+            tokens = tokens[:Config.MAX_CAPTION_LENGTH-1] + [self.vocab.word2idx["<EOS>"]]
+
+        return image, torch.tensor(tokens)
+
 def get_iu_xray_data():
-    pass
+    """
+    Process IU X-Ray dataset - this is a placeholder function
+    You'll need to adapt this to your specific dataset structure
+    """
+    # This is where you'd parse your specific dataset files
+    # For example, loading the IU X-ray reports and extracting relevant sections
+
+    # Placeholder  - replace with actual data loading
+    image_paths = []
+    captions = []
 
 
 def create_data_loaders():
@@ -135,12 +172,29 @@ def create_data_loaders():
 
 
     # Creata datasets
-    train_transform = transforms.Compose(
+    train_transform = transforms.Compose([
         transforms.Resize(Config.IMG_SIZE),
-        transforms.RandomHorizontalFlip(p=0.2),
-        transforms.RandomAffine(degrees=5, translate=(0.05, 0.05))
-         
-    ) # Careful with medical images
+        transforms.RandomHorizontalFlip(p=0.2), # Careful with medical images
+        transforms.RandomAffine(degrees=5, translate=(0.05, 0.05)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=Config.PIXEL_MEAN, std = Config.PIXEL_STD)     
+    ]) 
+
+    val_transform = transforms.Compose([
+        transforms.Resize(Config.IMG_SIZE),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=Config.PIXEL_MEAN, std = Config.PIXEL_STD)
+    ])
+
+    train_dataset = MedicalCaptionDataset(
+        [image_paths[i] for i in train_indices],
+        [captions[i] for i in train_indices],
+        vocab,
+        transform = train_transform
+    )
+
+    val_dataset = MedicalCaptionDataset
+    
 
 
 
