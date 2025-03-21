@@ -147,7 +147,7 @@ class DecoderWithAttention(nn.Module):
         encoded_captions = encoded_captions[sort_ind]
 
         # Embedding
-        emebeddings = self.embedding(encoded_captions)
+        embeddings = self.embedding(encoded_captions)
 
         # Initialize LSTM state
         h, c = self.init_hiddene_state(encoder_out)
@@ -171,7 +171,24 @@ class DecoderWithAttention(nn.Module):
                 encoder_out[:batch_size_t], h[:batch_size_t]
             )
 
-            gate = self.sigmoid(self.f_beta(h[:batch_size_t]))
+            gate = self.sigmoid(self.f_beta(h[:batch_size_t])) # gating scalar [batch_size_t, encoder_dim]
+
+
+            attention_weighted_encoding = gate * attention_weighted_encoding
+            
+            h, c = self.decode_step(
+                torch.cat([embeddings[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
+                (h[:batch_size_t], c[:batch_size_t])
+            )
+
+            preds = self.decode_step(
+                torch.cat([embeddings[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
+                (h[:batch_size_t], c[:batch_size_t]) # [batch_size_t, decoder_dim]
+
+            )
+
+
+
 
 
 
