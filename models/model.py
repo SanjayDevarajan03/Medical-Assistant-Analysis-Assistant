@@ -181,12 +181,52 @@ class DecoderWithAttention(nn.Module):
                 (h[:batch_size_t], c[:batch_size_t])
             )
 
-            preds = self.decode_step(
-                torch.cat([embeddings[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
-                (h[:batch_size_t], c[:batch_size_t]) # [batch_size_t, decoder_dim]
+            preds = self.fc(self.dropout(h)) # [batch_size_t, vocab_size]
+            predictions[:batch_size_t, t, :]  = preds
+            alphas[:batch_size_t, t, :] = alpha
 
+        return predictions , encoded_captions, decode_lengths, alphas, sort_ind
+    
+    def predict(self, encoder_out, max_length=20):
+        """
+        Predict cpations for given images
+        encoder_out: [1, num_pixels, encoder_dim]
+        """
+        batch_size = encoder_out.size(0)
+
+        # Initialize LSTM state
+        h, c = self.init_hidden_state(encoder_out)
+
+        alphas = []
+        predictions = []
+
+        # Start token
+        word = torch.tensor([1]).to(Config.DEVICE)
+        emb = self.embedding(word) 
+
+        for i in range(max_length):
+            attention_weighted_encoding, alpha = self.attention(encoder_out, h)
+
+            gate = self.sigmoid(self.f_beta(h))
+            attention_weighted_encoding = gate * attention_weighted_encoding
+
+            h,c = self.decode_step(
+                torch.cat([emb, attention_weighted_encoding], dim=1),
+                (h,c)
             )
 
+            preds = self.fc(h)
+            predictions.append(preds)
+            alphas.append(alpha)
+
+            # Get next word with highest probability
+            word = preds.argamx(dim=1)
+            if word.item() == 2:
+                break
+                
+            emb = self.embedding(word)
+
+        return torch.cat([p.unsqueeze(1) for p in predictions], dim=1), torch.cat([a.unsqueeze for a in alphas], dim=1)
 
 
 
