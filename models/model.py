@@ -227,6 +227,39 @@ class DecoderWithAttention(nn.Module):
             emb = self.embedding(word)
 
         return torch.cat([p.unsqueeze(1) for p in predictions], dim=1), torch.cat([a.unsqueeze for a in alphas], dim=1)
+    
+
+class MedicalCaptionModel(nn.Module):
+    def __init__(self, vocab_size):
+        super(MedicalCaptionModel, self).__init__()
+        self.encoder = Encoder()
+        self.decoder = DecoderWithAttention(
+            vocab_size=vocab_size,
+            encoder_dim=self.encoder.enc_idm,
+            embed_dim = Config.EMBEDDING_DIM,
+            decoder_dim = Config.HIDDEN_DIM,
+            attention_dim = Config.ATTENTION_DIM,
+            dropout = Config.DROPOUT
+        )
+
+    def forward(self, images, captions, caption_lengths):
+        """
+        Forward propagation
+        images: [batch_size, 3, height, width]
+        captions: [batch_size, max_caption_length]
+        caption_lengths: [batch_size, 1]
+        """
+        encoder_out = self.encoder(images)
+        outputs = self.decoder(encoder_out, captions, caption_lengths)
+        return outputs
+    
+    def predict(self, images, max_length=20):
+        """
+        Predict captions for given images
+        images: [batch_size, 3, height, width]
+        """
+        encoder_out = self.encoder(images)
+        return self.decoder.predict(encoder_out, max_length)
 
 
 

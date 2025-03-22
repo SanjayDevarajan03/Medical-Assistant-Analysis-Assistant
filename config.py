@@ -41,6 +41,7 @@ class Config:
     ATTENTION_DIM = 512
     DECODER_LAYERS = 6
     ATTENTION_HEADS = 8
+    EMBEDDING_DIM = 512
     DROPOUT = 0.5
 
     # Training Parameters
