@@ -1,10 +1,19 @@
 import streamlit as st
+import os
 from PIL import Image
 import torch
+import tempfile
 from models.encoder import EncoderCNN
 from models.decoder import DecoderTransformer
 from inference.caption_generator import generate_caption
-from utils.visualization import visualize_attention
+from config import Config
+
+# Set page configuration
+st.set_age_config(
+    page_title = Config.APP_TITLE,
+    page_icon = "",
+    layout = "wide"
+)
 
 def main():
     st.title("Medical Image Captioning")
