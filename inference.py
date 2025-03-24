@@ -229,5 +229,5 @@ if __name__ == "__main__":
     print(f"Caption: {caption}")
 
     # Visualize attention if requested
-    if args.visualzie:
+    if args.visualize:
         visualize_attention(predictor, args.image, args.output) 
