@@ -99,4 +99,116 @@ def train_epoch(model, data_loader, optimizer, criterion, epoch):
     batch_count = 0
 
     # Progress bar
+    progress_bar = tqdm(data_loader, desc=f"Epoch {epoch+1}")
 
+    for i, (images, captions) in enumerate(progress_bar):
+        # Move to device
+        images = images.to(Config.DEVICE)
+        captions = captions.to(Config.DEVICE)
+
+        # Calculate caption lengths
+        caption_lengths =torch.tensor([len(cap)-cap.eq(0).sum().item() for cap in captions])
+        caption_lengths = caption_lengths.unsqueeze(1).to(Config.DEVICE)
+
+        # Zero gradients
+        optimizer.zero_grad()
+
+
+        # Forward pass
+        predictions, encoded_captions, decode_lengths, alphas, sort_ind = model(images, captions, caption_lengths)
+
+        # Calculate loss
+        targets = encoded_captions[:,1:] # Remove <SOS>
+
+        # Pack predictions for variable length sequences
+        predictions = pack_padded_sequence(predictions, decode_lengths, batch_first=True).data
+        targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
+
+        # Calculate loss
+        loss = criterion(predictions, targets)
+
+        # Add only doubly stochastic attention regularization
+        if Config.ATTENTION_DIM > 0:
+            alpha_loss = ((1-alphas.sum(dim=1))**2).mean()
+            loss += alpha_loss * 0.01
+
+        # Backward pass
+        loss.backward()
+
+        # Clip gradients
+        if Config.CLIP_GRAD_NORM > 0:
+            nn.utils.clip_grad_norm_(model.parameters(), Config.CLIP_GRAD_NORM)
+
+        # Update weights
+        optimizer.step()
+
+        # Update progress bar
+        progress_bar.set_postfix(loss=loss.item())
+
+        # Update statistics
+        epoch_loss += loss.item()
+        batch_count += 1
+
+        # log interval
+        if (i+1)% Config.LOG_INTERVAL == 0:
+            print(f"Epoch {epoch+1}, Batch {i+1}/{len(data_loader)}, Loss: {loss.item():.4f}")
+
+    return epoch_loss/batch_count
+
+def validate(model, data_loader, criterion):
+    """Evaluate model on validation set"""
+    model.eval()
+    val_loss = 0
+    batch_count = 0
+
+    with torch.no_grad():
+        for images, captions in tqdm(data_loader, desc="Validation"):
+            # Move to device
+            images = images.to(Config.DEVICE)
+            captions = captions.to(Config.DEVICE)
+
+            # Calculate caption lengths
+            caption_lengths = torch.tensor([len(cap)-cap.eq(0).sum().item() for cap in captions])
+            caption_lengths = caption_lengths.unsqueeze(1).to(Config.DEVICE)
+
+            # Forward pass
+            predictions, encoded_captions, decode_lengths, alphas, sort_ind = model(images, captions, caption_lengths)
+
+            # Calculate loss 
+            targets = encoded_captions[:,1:]
+
+            # Pack predictions for variable length sequences
+            predictions = pack_padded_sequence(predictions, decode_lengths, batch_first=True).data
+            targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
+
+            # Calculate loss
+            loss = criterion(predictions, targets)
+
+            # Update statistics
+            val_loss += loss.item()
+            batch_count += 1
+
+    return val_loss / batch_count
+
+def save_checkpoint(model, optimizer, epoch, val_loss, is_best=False, is_final=False):
+    """Save model checkpoint"""
+    checkpoint = {
+        "epoch": epoch,
+        "model_state_dict": model.state.dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "val_loss": val_loss
+    }
+
+    if is_best:
+        checkpoint_path = os.path.join(Config.MODEL_DIR, "best_model.pth")
+    elif is_final:
+        checkpoint_path = os.path.join(Config.MODEL_DIR, "final_model.pth")
+    else:
+        checkpoint_path = os.path.join(Config.MODEL_DIR, f"model_epoch_{epoch+1}.pth")
+
+    torch.save(checkpoint,checkpoint_path)
+    print(f"Checkpoint saved to {checkpoint_path}")
+
+
+if __name__ == "__main__":
+    train()
