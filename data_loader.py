@@ -1,6 +1,7 @@
 import os
 import json
 import torch
+import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -102,7 +103,7 @@ def load_and_preprocess_image(image_path):
 
 
 class MedicalCaptionDataset(Dataset):
-    def __init__(self, image_paths, captions, vocabulary, transform=None):
+    def __init__(self, image_paths, captions, vocabulary, transform=None, cache_size=1000):
         self.image_paths = image_paths
         self.captions= captions
         self.vocab = vocabulary
@@ -112,13 +113,30 @@ class MedicalCaptionDataset(Dataset):
             transforms.Normalize(mean=Config.PIXEL_MEAN, std=Config.PIXEL_STD)
         ])
 
+        # Simple caching mechanism
+        self.image_cache = {}
+        self.cache_size = cache_size
+
+
+
 
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
         caption = self.captions[idx]
 
-        # Load and preprocess image
-        image = load_and_preprocess_image(image_path)
+        # Check cache first
+        if image_path in self.image_cache:
+            image = self.image_cache[image_path]
+        else:
+            # Load and preprocess image
+            image = load_and_preprocess_image(image_path)
+
+            if len(self.image_cache) >= self.cache_size:
+                # Remove oldest item
+                self.image_cache.pop(next(iter(self.image_cache)))
+            self.image_cache[image_path] = image
+
+        
         if image is None:
             # Return a placeholder if image loading fails
             image = Image.new('RGB', Config.IMG_SIZE, color=0)
@@ -129,7 +147,7 @@ class MedicalCaptionDataset(Dataset):
 
         # Tokenize caption 
         tokens = [self.vocab.word2idx.get(word.lower(), self.vocab.word2idx["<UNK>"]) for word in caption.split()]
-        tokens = [self.vocab.word2idx["<SSO>"]] + tokens + [self.vocab.word2idx["<EOS>"]]
+        tokens = [self.vocab.word2idx["<SOS>"]] + tokens + [self.vocab.word2idx["<EOS>"]]
 
         # Pad or truncate caption
         if len(tokens) < Config.MAX_CAPTION_LENGTH:
@@ -138,6 +156,11 @@ class MedicalCaptionDataset(Dataset):
             tokens = tokens[:Config.MAX_CAPTION_LENGTH-1] + [self.vocab.word2idx["<EOS>"]]
 
         return image, torch.tensor(tokens)
+    
+    def __len__(self):
+        """Return the total number of samples in the dataset."""
+        # If your dataset is based on a list of samples, return its length
+        return len(self.image_paths)  # Adjust this to match your actual data structure
 
 def get_iu_xray_data():
     """
@@ -147,40 +170,66 @@ def get_iu_xray_data():
     # This is where you'd parse your specific dataset files
     # For example, loading the IU X-ray reports and extracting relevant sections
 
-    # Placeholder  - replace with actual data loading
+    reports_path = Config.REPORTS_PATH
+    projections_path = Config.PROJECTIONS_PATH
+    if not reports_path.exists() or not projections_path.exists():
+        print(f"Warning: CSV files not found at:")
+
+    
     image_paths = []
     captions = []
 
     # Sample data processing logic (replace with actual implementation)
     dataset_path = Config.IU_XRAY_PATH
-    images_dir = dataset_path/"files"
+    images_dir = dataset_path/"images"/"images_normalized"
     reports_file = dataset_path/"reports.json"
 
-    if not os.path.exists(reports_file):
-        print(f"Reports file not found: {reports_file}")
-        # For demo purposes, create dummy files
+    # Check if paths exist and use dummy data if they don't
+    if not images_dir.exists() or not reports_file.exists():
+        print(f"Warning: Data path not found. Using dummy data instead.")
+        print(f"Images directory: {images_dir}")
+        print(f"Reports file: {reports_file}")
+        
+        # Create dummy data for testing - UNCOMMENT THIS SECTION
         for i in range(100):
             image_paths.append(f"dummy_path_{i}.jpg")
             captions.append(f"This is a normal chest X-ray with no significant findings.")
+        
+        print(f"Created {len(image_paths)} dummy samples")
         return image_paths, captions
     
+    # If we get here, both paths exist
     # Load reports
     with open(reports_file, 'r') as f:
         reports = json.load(f)
 
     # Process reports and match with images
     for study_id, report in reports.items():
-        # Find corresponding images
-        study_images = list((images_dir/study_id).glob("*.dcm"))
-        if study_images:
-            # Extract findings ection as caption
-            findings= report.get("findings","No findings recorded")
+        study_dir = images_dir / study_id
 
-            # Add each image with the same report
-            for img_path in study_images:
-                image_paths.append(str(img_path))
-                captions.append(findings)
+        # Check if study directory exists
+        if not study_dir.exists():
+            continue
 
+        # Find all .dcm and .png files in the study directory
+        study_images = list(study_dir.glob("*.dcm")) + list(study_dir.glob("*.png"))
+
+        # Extract findings
+        findings = report.get("findings", "No findings recorded")
+
+        # Add each image with the study's report
+        for img_path in study_images:
+            image_paths.append(str(img_path))
+            captions.append(findings)
+
+    # If no images were found, use dummy data
+    if not image_paths:
+        print("No valid images found. Using dummy data.")
+        for i in range(100):
+            image_paths.append(f"dummy_path_{i}.jpg")
+            captions.append(f"This is a normal chest X-ray with no significant findings.")
+
+    print(f"Loaded {len(image_paths)} images with corresponding reports")
     return image_paths, captions
 
 
@@ -192,7 +241,7 @@ def create_data_loaders():
 
     # Create vocabulary
     vocab = Vocabulary()
-    vocab.build_voacb(captions, threshold = Config.MIN_WORD_FREQ)
+    vocab.build_vocab(captions, threshold = Config.MIN_WORD_FREQ)
 
     # Split data
     data_size= len(image_paths)
