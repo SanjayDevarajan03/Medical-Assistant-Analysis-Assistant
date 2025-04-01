@@ -7,7 +7,7 @@ import pydicom
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 
-from models.model import MedicalCaptionModel
+from model import MedicalCaptionModel
 from data_loader import Vocabulary, load_and_preprocess_image
 from config import Config
 import argparse
@@ -21,7 +21,7 @@ class MedicalCaptionPredictor:
         self.vocab = Vocabulary()
         self.vocab.load(vocab_path)
 
-        # Initialize odel
+        # Initialize model
         self.model = MedicalCaptionModel(vocab_size=len(self.vocab))
 
         # Load checkpoint
@@ -31,7 +31,7 @@ class MedicalCaptionPredictor:
         self.model.eval()
 
         # Image transforms
-        self.transfrom = transforms.Compose([
+        self.transform = transforms.Compose([
             transforms.Resize(Config.IMG_SIZE),
             transforms.ToTensor(),
             transforms.Normalize(mean=Config.PIXEL_MEAN, std=Config.PIXEL_STD)
@@ -46,7 +46,7 @@ class MedicalCaptionPredictor:
             # Assuming it's a;ready a PIL Image
             image = image_path
         
-        image = self.transform(image).unsqueeeze(0).to(self.device)
+        image = self.transform(image).unsqueeze(0).to(self.device)
 
         # Generate caption
         with torch.no_grad():
@@ -79,7 +79,7 @@ class MedicalCaptionPredictor:
         h,c = self.model.decoder.init_hidden_state(encoder_out)
 
         # We' ll keep track of the top beam_size candidates
-        candidates = [([self.vocab.word2idx["<SOS"]], 0.0, h,c)]
+        candidates = [([self.vocab.word2idx["<SOS>"]], 0.0, h,c)]
 
         # Beam Search
         for _ in range(max_length):
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     predictor = MedicalCaptionPredictor(args.model, args.vocab)
 
     # Generate caption
-    caption = predictor.predict(args.iamge, beam_size = args.beam_size)
+    caption = predictor.predict(args.image, beam_size = args.beam_size)
 
     print(f"Caption: {caption}")
 

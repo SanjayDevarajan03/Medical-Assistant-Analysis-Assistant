@@ -9,7 +9,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from models.model import MedicalCaptionModel
+from model import MedicalCaptionModel
 from data_loader import create_data_loaders, Vocabulary
 from config import Config
 
@@ -118,7 +118,7 @@ def train_epoch(model, data_loader, optimizer, criterion, epoch):
         predictions, encoded_captions, decode_lengths, alphas, sort_ind = model(images, captions, caption_lengths)
 
         # Calculate loss
-        targets = encoded_captions[:,1:] # Remove <SOS>
+        targets = encoded_captions[:,1:]
 
         # Pack predictions for variable length sequences
         predictions = pack_padded_sequence(predictions, decode_lengths, batch_first=True).data
@@ -194,7 +194,7 @@ def save_checkpoint(model, optimizer, epoch, val_loss, is_best=False, is_final=F
     """Save model checkpoint"""
     checkpoint = {
         "epoch": epoch,
-        "model_state_dict": model.state.dict(),
+        "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "val_loss": val_loss
     }

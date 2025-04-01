@@ -173,11 +173,12 @@ def get_iu_xray_data():
     reports_path = Config.REPORTS_PATH
     projections_path = Config.PROJECTIONS_PATH
     if not reports_path.exists() or not projections_path.exists():
-        print(f"Warning: CSV files not found at:")
-
-    
+        print(f"Warning: CSV files not found.")
     image_paths = []
     captions = []
+
+    
+    
 
     # Sample data processing logic (replace with actual implementation)
     dataset_path = Config.IU_XRAY_PATH

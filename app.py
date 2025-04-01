@@ -11,7 +11,7 @@ from data_loader import load_and_preprocess_image
 from config import Config
 
 # Set page configuration
-st.set_age_config(
+st.set_page_config(
     page_title = Config.APP_TITLE,
     page_icon = "",
     layout = "wide"
@@ -98,7 +98,7 @@ def create_attention_visualization(predictor, image):
 
             # Display image with attention overlay
             axes[1,i].imshow(image)
-            axes[i,i].imshow(word_attention,cmap="viridis", alphas=0.7)
+            axes[i,i].imshow(word_attention,cmap="viridis", alpha=0.7)
             axes[1,i].set_title(f"Attention: {caption[i]}")
             axes[1,i].axis('off')
 
@@ -126,32 +126,40 @@ def main():
 
     # Image upload
     st.header("Upload Medical Image")
-    uploaded_file = st.file_uplaoder("Choose a medical image file", type=["png", "jpg", "jpeg", "dcm"], help = "Suppored formats: JPEG, PNG, DICOM")
+    uploaded_file = st.file_uploader("Choose a medical image file", type=["png", "jpg", "jpeg", "dcm"], help = "Suppored formats: JPEG, PNG, DICOM")
 
-    if uploaded_file is None:
-        with st.spinner("Process image..."):
+    if uploaded_file is not None:
+        with st.spinner("Processing image..."):
             try:
                 file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-                if file_extension == ".dcm":
-                    # For DICOM files, we need to save to a temp file first
-                    with tempfile.NamedTemporaryFile(suffix = ".dcm", delete=False) as tmp:
+                
+                # Handle DICOM files
+                if file_extension == '.dcm':
+                    # Create a temporary file to save the uploaded DICOM
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.dcm') as tmp:
                         tmp.write(uploaded_file.getvalue())
                         tmp_path = tmp.name
                     
                     # Use the function from data_loader
                     image = load_and_preprocess_image(tmp_path)
-                    os.unlink(tmp_path) # Clena up temp file
+                    if image is None:
+                        st.error("Could not process the DICOM file. It may be corrupted or in an unsupported format.") 
+                    os.unlink(tmp_path)  # Clean up temp file
 
                 else:
                     # Regular image file
-                    image = Image.open(uploaded_file).convert('RGB')
+                    try:
+                        image = Image.open(uploaded_file).convert('RGB')
+                    except Exception as e:
+                        st.error(f"Could not open image file: {e}")
+                      # Skip the rest of this iteration
                 
                 # Create columns for layout
                 col1, col2 = st.columns(2)
 
                 with col1:
                     st.subheader("Uploaded Image")
-                    st.image(image, caption="Uploaded medical image", use_column_width=True)
+                    st.image(image, caption="Uploaded medical image", use_container_width=True)
 
                 # Generate caption
                 caption = generate_caption(predictor, image, beam_size)
@@ -164,14 +172,16 @@ def main():
                 # Show attention visualization
                 if show_attention and predictor is not None:
                     st.subheader("Attention Visualization")
-                    st.markdown("This shows whoch parts of the image the model focuses on for each word.")
+                    st.markdown("This shows which parts of the image the model focuses on for each word.")
 
-                    fig, full_caption  =create_attention_visualization(predictor, image)
+                    fig, full_caption = create_attention_visualization(predictor, image)
                     if fig:
                         st.pyplot(fig)
 
             except Exception as e:
-                st.error(f"Error processing imageL {e}")
+                st.error(f"Error processing image: {e}")
+                import traceback
+                st.error(traceback.format_exc())
 
 
     # About Section
